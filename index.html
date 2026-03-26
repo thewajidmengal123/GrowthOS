@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web3 Growth Dashboard | Wajid Mengal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        h1, h2, h3, .brand-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        body {
+            background: #0a0a0f;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(120, 58, 237, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+        }
+        .glass-card {
+            background: rgba(20, 20, 30, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #a855f7 0%, #3b82f6 50%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .gradient-border {
+            position: relative;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.2));
+            padding: 1px;
+            border-radius: 1rem;
+        }
+        .gradient-border-inner {
+            background: rgba(20, 20, 30, 0.8);
+            border-radius: calc(1rem - 1px);
+            height: 100%;
+        }
+        .checkbox-custom {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(168, 85, 247, 0.5);
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .checkbox-custom:checked {
+            background: linear-gradient(135deg, #a855f7, #3b82f6);
+            border-color: transparent;
+        }
+        .checkbox-custom:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #a855f7 0%, #3b82f6 50%, #06b6d4 100%);
+            transition: width 0.5s ease;
+        }
+        .streak-flame {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        .tab-active {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(59, 130, 246, 0.2));
+            border: 1px solid rgba(168, 85, 247, 0.5);
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+        }
+        input[type="number"], input[type="text"], select {
+            background: rgba(30, 30, 40, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #a855f7;
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+        }
+        .delete-btn {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .entry-card:hover .delete-btn {
+            opacity: 1;
+        }
+        .edit-btn {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .entry-card:hover .edit-btn {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="text-gray-200 min-h-screen pb-20">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 glass-card border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
+                        <i class="fas fa-rocket text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold gradient-text">GrowthOS</h1>
+                        <p class="text-xs text-gray-400">Web3 Productivity</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="hidden md:flex items-center space-x-2 text-sm">
+                        <span class="text-gray-400">Current Streak:</span>
+                        <span class="text-orange-400 font-bold streak-flame" id="streakDisplay">0 🔥</span>
+                    </div>
+                    <button onclick="resetAllData()" class="p-2 hover:bg-white/10 rounded-lg transition-colors" title="Reset All Data">
+                        <i class="fas fa-trash-alt text-red-400"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        
+        <!-- Date & Progress Header -->
+        <div class="mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div>
+                    <h2 class="text-3xl font-bold mb-1" id="currentDate">Loading...</h2>
+                    <p class="text-gray-400" id="currentDay">Loading...</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-sm text-gray-400">Daily Progress</p>
+                        <p class="text-2xl font-bold gradient-text" id="progressPercent">0%</p>
+                    </div>
+                    <div class="w-16 h-16 relative">
+                        <svg class="w-full h-full transform -rotate-90">
+                            <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.1)" stroke-width="4" fill="none"/>
+                            <circle id="progressCircle" cx="32" cy="32" r="28" stroke="url(#gradient)" stroke-width="4" fill="none" 
+                                stroke-dasharray="175.9" stroke-dashoffset="175.9" stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#a855f7" />
+                                    <stop offset="50%" stop-color="#3b82f6" />
+                                    <stop offset="100%" stop-color="#06b6d4" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weekly Progress -->
+            <div class="glass-card rounded-2xl p-4 mb-6">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-sm font-medium text-gray-300">Weekly Progress</span>
+                    <span class="text-xs text-gray-400" id="weeklyStats">0/7 days</span>
+                </div>
+                <div class="flex space-x-2" id="weeklyBar">
+                    <!-- Generated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="flex space-x-2 mb-6 overflow-x-auto pb-2">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-active px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap">
+                <i class="fas fa-chart-line mr-2"></i>Dashboard
+            </button>
+            <button onclick="switchTab('content')" id="tab-content" class="px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-all whitespace-nowrap">
+                <i class="fas fa-calendar-alt mr-2"></i>Content Planner
+            </button>
+            <button onclick="switchTab('history')" id="tab-history" class="px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-all whitespace-nowrap">
+                <i class="fas fa-history mr-2"></i>History
+            </button>
+            <button onclick="switchTab('ai')" id="tab-ai" class="px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-all whitespace-nowrap">
+                <i class="fas fa-brain mr-2"></i>AI Suggestions
+            </button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content slide-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <!-- Trading Card -->
+                <div class="gradient-border rounded-2xl">
+                    <div class="gradient-border-inner p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                                    <i class="fas fa-chart-candlestick text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-bold">Trading</h3>
+                            </div>
+                            <span class="text-xs text-gray-400 bg-white/5 px-3 py-1 rounded-full">Max 1-2 trades</span>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="tradeTaken" onchange="updateTask('trading', 'tradeTaken', this.checked)">
+                                <span class="text-gray-300">Trade Taken</span>
+                            </label>
+                            
+                            <div id="tradeDetails" class="hidden space-y-3 pl-8">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <select id="tradeResult" onchange="updateTask('trading', 'result', this.value)" class="w-full px-3 py-2 rounded-lg text-sm">
+                                        <option value="">Result</option>
+                                        <option value="win">Win 🟢</option>
+                                        <option value="loss">Loss 🔴</option>
+                                    </select>
+                                    <input type="text" id="tradeRR" placeholder="RR Ratio (e.g. 1:2)" onchange="updateTask('trading', 'rr', this.value)" class="w-full px-3 py-2 rounded-lg text-sm">
+                                </div>
+                                <input type="text" id="tradeReason" placeholder="Reason for trade..." onchange="updateTask('trading', 'reason', this.value)" class="w-full px-3 py-2 rounded-lg text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Career Card -->
+                <div class="gradient-border rounded-2xl">
+                    <div class="gradient-border-inner p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                                    <i class="fas fa-briefcase text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-bold">Career / Work</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="jobSearch" onchange="updateTask('career', 'jobSearch', this.checked)">
+                                <span class="text-gray-300">Job search done</span>
+                            </label>
+                            
+                            <div class="flex items-center space-x-3">
+                                <span class="text-gray-400 text-sm w-24">DMs sent:</span>
+                                <input type="number" id="dmsSent" min="0" onchange="updateTask('career', 'dmsSent', this.value)" class="w-20 px-3 py-2 rounded-lg text-sm text-center">
+                            </div>
+                            
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="opportunities" onchange="updateTask('career', 'opportunities', this.checked)">
+                                <span class="text-gray-300">Opportunities explored</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Card -->
+                <div class="gradient-border rounded-2xl">
+                    <div class="gradient-border-inner p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
+                                    <i class="fas fa-camera text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-bold">Content</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="instagramReel" onchange="updateTask('content', 'instagramReel', this.checked)">
+                                <span class="text-gray-300">Instagram Reel uploaded</span>
+                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="youtubeLive" onchange="updateTask('content', 'youtubeLive', this.checked)">
+                                <span class="text-gray-300">YouTube live / video</span>
+                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="tweetPosted" onchange="updateTask('content', 'tweetPosted', this.checked)">
+                                <span class="text-gray-300">Tweet posted</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Health Card -->
+                <div class="gradient-border rounded-2xl">
+                    <div class="gradient-border-inner p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                                    <i class="fas fa-heartbeat text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-bold">Health</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="gymDone" onchange="updateTask('health', 'gymDone', this.checked)">
+                                <span class="text-gray-300">Gym done</span>
+                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="walkCompleted" onchange="updateTask('health', 'walkCompleted', this.checked)">
+                                <span class="text-gray-300">Walk completed</span>
+                            </label>
+                            <div class="flex items-center space-x-3 pt-2">
+                                <span class="text-gray-400 text-sm w-24">Water (glasses):</span>
+                                <input type="number" id="waterIntake" min="0" onchange="updateTask('health', 'waterIntake', this.value)" class="w-20 px-3 py-2 rounded-lg text-sm text-center">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Learning Card -->
+                <div class="gradient-border rounded-2xl lg:col-span-2">
+                    <div class="gradient-border-inner p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+                                    <i class="fas fa-brain text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-bold">Learning / Building</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label class="flex items-center space-x-3 cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-colors">
+                                <input type="checkbox" class="checkbox-custom" id="learningDone" onchange="updateTask('learning', 'learningDone', this.checked)">
+                                <span class="text-gray-300">Learning done (course/article)</span>
+                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-colors">
+                                <input type="checkbox" class="checkbox-custom" id="projectBuilding" onchange="updateTask('learning', 'projectBuilding', this.checked)">
+                                <span class="text-gray-300">Project building / coding</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quote Section -->
+            <div class="mt-8 glass-card rounded-2xl p-6 text-center">
+                <i class="fas fa-quote-left text-purple-500 text-2xl mb-3 opacity-50"></i>
+                <p class="text-lg italic text-gray-300 mb-2" id="dailyQuote">"Discipline is the bridge between goals and accomplishment."</p>
+                <p class="text-sm text-gray-500" id="quoteAuthor">— Jim Rohn</p>
+            </div>
+        </div>
+
+        <!-- Content Planner Tab -->
+        <div id="content" class="tab-content hidden slide-in">
+            <div class="mb-6 flex justify-between items-center">
+                <h3 class="text-2xl font-bold gradient-text">30-Day Content Strategy</h3>
+                <div class="flex space-x-2">
+                    <button onclick="generateTrendingIdeas()" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                        <i class="fas fa-magic mr-2"></i>Generate Trending Ideas
+                    </button>
+                </div>
+            </div>
+
+            <!-- Trending Ideas Section -->
+            <div id="trendingSection" class="hidden mb-8 glass-card rounded-2xl p-6 border border-purple-500/30">
+                <h4 class="text-lg font-bold mb-4 flex items-center">
+                    <i class="fas fa-fire text-orange-500 mr-2"></i>
+                    Trending Ideas This Week
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="trendingIdeas">
+                    <!-- Generated by JS -->
+                </div>
+            </div>
+
+            <!-- 30 Day Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="contentPlanner">
+                <!-- Generated by JS -->
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history" class="tab-content hidden slide-in">
+            <div class="mb-6 flex justify-between items-center">
+                <h3 class="text-2xl font-bold gradient-text">Activity Journal</h3>
+                <div class="flex space-x-2">
+                    <select id="historyFilter" onchange="renderHistory()" class="px-4 py-2 rounded-lg text-sm">
+                        <option value="all">All Entries</option>
+                        <option value="trading">Trading Days</option>
+                        <option value="completed">Completed Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="space-y-4" id="historyList">
+                <!-- Generated by JS -->
+            </div>
+
+            <div id="emptyHistory" class="hidden text-center py-12 text-gray-500">
+                <i class="fas fa-calendar-times text-4xl mb-3 opacity-50"></i>
+                <p>No history entries yet. Start completing your daily tasks!</p>
+            </div>
+        </div>
+
+        <!-- AI Suggestions Tab -->
+        <div id="ai" class="tab-content hidden slide-in">
+            <div class="text-center mb-8">
+                <h3 class="text-2xl font-bold gradient-text mb-2">AI Growth Assistant</h3>
+                <p class="text-gray-400">Personalized suggestions for your Web3 journey</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Productivity Tips -->
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <h4 class="text-lg font-bold">Daily Productivity Tips</h4>
+                    </div>
+                    <ul class="space-y-3 text-gray-300" id="productivityTips">
+                        <li class="flex items-start space-x-2">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Start your day with the hardest task (Eat the frog method)</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Use the Pomodoro technique: 25min work, 5min break</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Batch similar tasks together (all DMs at once)</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Content Ideas -->
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
+                            <i class="fas fa-video text-white"></i>
+                        </div>
+                        <h4 class="text-lg font-bold">Content Ideas</h4>
+                    </div>
+                    <ul class="space-y-3 text-gray-300" id="contentIdeas">
+                        <li class="flex items-start space-x-2">
+                            <i class="fas fa-star text-yellow-500 mt-1"></i>
+                            <span>"Day in the life of a Web3 Growth Lead"</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fas fa-star text-yellow-500 mt-1"></i>
+                            <span>"3 Solana tools that changed my workflow"</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fas fa-star text-yellow-500 mt-1"></i>
+                            <span>"How I grew my Discord from 0 to 10k"</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Growth Strategy -->
+                <div class="glass-card rounded-2xl p-6 md:col-span-2">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-600 flex items-center justify-center">
+                            <i class="fas fa-rocket text-white"></i>
+                        </div>
+                        <h4 class="text-lg font-bold">Growth Suggestions</h4>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="growthSuggestions">
+                        <div class="bg-white/5 rounded-xl p-4">
+                            <h5 class="font-semibold text-purple-400 mb-2">Network Expansion</h5>
+                            <p class="text-sm text-gray-400">Connect with 5 new Web3 founders on Twitter this week. Engagement > Followers.</p>
+                        </div>
+                        <div class="bg-white/5 rounded-xl p-4">
+                            <h5 class="font-semibold text-blue-400 mb-2">Skill Building</h5>
+                            <p class="text-sm text-gray-400">Learn Rust basics for Solana development. Start with "Hello World" program.</p>
+                        </div>
+                        <div class="bg-white/5 rounded-xl p-4">
+                            <h5 class="font-semibold text-cyan-400 mb-2">Content Strategy</h5>
+                            <p class="text-sm text-gray-400">Post 1 educational thread weekly. Authority builds trust in Web3.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 text-center">
+                <button onclick="refreshAISuggestions()" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl font-medium hover:opacity-90 transition-opacity">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh Suggestions
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completion Modal -->
+    <div id="completionModal" class="fixed inset-0 z-50 hidden modal-overlay flex items-center justify-center p-4">
+        <div class="glass-card rounded-3xl p-8 max-w-md w-full text-center border border-green-500/30 transform scale-95 opacity-0 transition-all duration-300" id="modalContent">
+            <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
+                <i class="fas fa-check text-3xl text-white"></i>
+            </div>
+            <h3 class="text-2xl font-bold mb-2 gradient-text">Congratulations! 🎉</h3>
+            <p class="text-gray-300 mb-2">Today's tasks completed.</p>
+            <p class="text-lg font-semibold text-green-400 mb-6">Now you are free to relax or explore.</p>
+            
+            <div class="flex justify-center space-x-4">
+                <button onclick="closeModal()" class="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">
+                    Close
+                </button>
+                <button onclick="switchTab('history'); closeModal();" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl hover:opacity-90 transition-opacity">
+                    View History
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Entry Modal -->
+    <div id="editModal" class="fixed inset-0 z-50 hidden modal-overlay flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl p-6 max-w-lg w-full border border-purple-500/30">
+            <h3 class="text-xl font-bold mb-4 gradient-text">Edit Entry</h3>
+            <div id="editForm" class="space-y-4">
+                <!-- Dynamic content -->
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeEditModal()" class="px-4 py-2 text-gray-400 hover:text-white transition-colors">Cancel</button>
+                <button onclick="saveEdit()" class="px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-lg hover:opacity-90 transition-opacity">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Structure
+        let appData = {
+            currentDate: new Date().toISOString().split('T')[0],
+            streak: 0,
+            lastCompletedDate: null,
+            weeklyProgress: [false, false, false, false, false, false, false],
+            history: {},
+            contentPlan: generateDefaultContentPlan(),
+            quotes: [
+                { text: "Discipline is the bridge between goals and accomplishment.", author: "Jim Rohn" },
+                { text: "Success is the sum of small efforts, repeated day in and day out.", author: "Robert Collier" },
+                { text: "The future depends on what you do today.", author: "Mahatma Gandhi" },
+                { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+                { text: "Your limitation—it's only your imagination.", author: "Unknown" }
+            ]
+        };
+
+        let currentEditDate = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            updateDateDisplay();
+            initializeDailyData();
+            renderAll();
+            setupTradeToggle();
+            loadRandomQuote();
+        });
+
+        function generateDefaultContentPlan() {
+            const plan = [];
+            const topics = [
+                { hook: "Why 99% traders fail", topic: "Discipline in trading", cta: "Follow for real strategies" },
+                { hook: "I posted 50 reels — here's what happened", topic: "Consistency", cta: "Comment 'growth'" },
+                { hook: "Don't start Web3 like this", topic: "Beginner mistakes", cta: "Save this" },
+                { hook: "The truth about Solana NFTs", topic: "Market insights", cta: "RT if you agree" },
+                { hook: "How I 10x my productivity", topic: "Tools & systems", cta: "Thread below 🧵" },
+                { hook: "Web3 growth hacks that actually work", topic: "Growth strategies", cta: "Follow for more" },
+                { hook: "Why community > marketing", topic: "Community building", cta: "Share your thoughts" }
+            ];
+
+            for (let i = 1; i <= 30; i++) {
+                const topic = topics[(i - 1) % topics.length];
+                plan.push({
+                    day: i,
+                    hook: topic.hook,
+                    topic: topic.topic,
+                    cta: topic.cta,
+                    completed: false
+                });
+            }
+            return plan;
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('growthOSData');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                appData = { ...appData, ...parsed };
+                
+                // Check if it's a new day
+                const today = new Date().toISOString().split('T')[0];
+                if (appData.currentDate !== today) {
+                    saveDayToHistory();
+                    appData.currentDate = today;
+                    initializeDailyData();
+                }
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('growthOSData', JSON.stringify(appData));
+        }
+
+        function saveDayToHistory() {
+            const today = appData.currentDate;
+            const todayData = appData.history[today] || getCurrentDayData();
+            
+            if (isDayCompleted(todayData)) {
+                appData.history[today] = todayData;
+                
+                // Update streak
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toISOString().split('T')[0];
+                
+                if (appData.lastCompletedDate === yesterdayStr || !appData.lastCompletedDate) {
+                    appData.streak++;
+                } else if (appData.lastCompletedDate !== today) {
+                    appData.streak = 1;
+                }
+                
+                appData.lastCompletedDate = today;
+                updateWeeklyProgress(true);
+            } else {
+                updateWeeklyProgress(false);
+                appData.streak = 0;
+            }
+            
+            saveData();
+        }
+
+        function getCurrentDayData() {
+            return {
+                date: appData.currentDate,
+                trading: {
+                    tradeTaken: document.getElementById('tradeTaken').checked,
+                    result: document.getElementById('tradeResult').value,
+                    rr: document.getElementById('tradeRR').value,
+                    reason: document.getElementById('tradeReason').value
+                },
+                career: {
+                    jobSearch: document.getElementById('jobSearch').checked,
+                    dmsSent: document.getElementById('dmsSent').value || 0,
+                    opportunities: document.getElementById('opportunities').checked
+                },
+                content: {
+                    instagramReel: document.getElementById('instagramReel').checked,
+                    youtubeLive: document.getElementById('youtubeLive').checked,
+                    tweetPosted: document.getElementById('tweetPosted').checked
+                },
+                health: {
+                    gymDone: document.getElementById('gymDone').checked,
+                    walkCompleted: document.getElementById('walkCompleted').checked,
+                    waterIntake: document.getElementById('waterIntake').value || 0
+                },
+                learning: {
+                    learningDone: document.getElementById('learningDone').checked,
+                    projectBuilding: document.getElementById('projectBuilding').checked
+                }
+            };
+        }
+
+        function initializeDailyData() {
+            const today = appData.currentDate;
+            if (!appData.history[today]) {
+                // Reset form for new day
+                document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                document.querySelectorAll('input[type="number"], input[type="text"], select').forEach(input => input.value = '');
+                document.getElementById('tradeDetails').classList.add('hidden');
+            } else {
+                // Load existing data
+                const data = appData.history[today];
+                loadDayData(data);
+            }
+        }
+
+        function loadDayData(data) {
+            if (data.trading) {
+                document.getElementById('tradeTaken').checked = data.trading.tradeTaken;
+                document.getElementById('tradeResult').value = data.trading.result || '';
+                document.getElementById('tradeRR').value = data.trading.rr || '';
+                document.getElementById('tradeReason').value = data.trading.reason || '';
+                if (data.trading.tradeTaken) document.getElementById('tradeDetails').classList.remove('hidden');
+            }
+            if (data.career) {
+                document.getElementById('jobSearch').checked = data.career.jobSearch;
+                document.getElementById('dmsSent').value = data.career.dmsSent || '';
+                document.getElementById('opportunities').checked = data.career.opportunities;
+            }
+            if (data.content) {
+                document.getElementById('instagramReel').checked = data.content.instagramReel;
+                document.getElementById('youtubeLive').checked = data.content.youtubeLive;
+                document.getElementById('tweetPosted').checked = data.content.tweetPosted;
+            }
+            if (data.health) {
+                document.getElementById('gymDone').checked = data.health.gymDone;
+                document.getElementById('walkCompleted').checked = data.health.walkCompleted;
+                document.getElementById('waterIntake').value = data.health.waterIntake || '';
+            }
+            if (data.learning) {
+                document.getElementById('learningDone').checked = data.learning.learningDone;
+                document.getElementById('projectBuilding').checked = data.learning.projectBuilding;
+            }
+        }
+
+        function updateTask(category, field, value) {
+            const today = appData.currentDate;
+            if (!appData.history[today]) {
+                appData.history[today] = { date: today };
+            }
+            if (!appData.history[today][category]) {
+                appData.history[today][category] = {};
+            }
+            
+            appData.history[today][category][field] = value;
+            saveData();
+            updateProgress();
+            
+            // Check completion
+            if (isDayCompleted(appData.history[today])) {
+                showCompletionModal();
+                triggerConfetti();
+            }
+        }
+
+        function isDayCompleted(data) {
+            if (!data) return false;
+            
+            const checks = [
+                data.trading?.tradeTaken,
+                data.career?.jobSearch,
+                data.career?.opportunities,
+                data.content?.instagramReel,
+                data.content?.youtubeLive,
+                data.content?.tweetPosted,
+                data.health?.gymDone,
+                data.health?.walkCompleted,
+                data.learning?.learningDone,
+                data.learning?.projectBuilding
+            ];
+            
+            return checks.every(check => check === true);
+        }
+
+        function updateProgress() {
+            const data = appData.history[appData.currentDate] || {};
+            const total = 10;
+            let completed = 0;
+            
+            if (data.trading?.tradeTaken) completed++;
+            if (data.career?.jobSearch) completed++;
+            if (data.career?.opportunities) completed++;
+            if (data.content?.instagramReel) completed++;
+            if (data.content?.youtubeLive) completed++;
+            if (data.content?.tweetPosted) completed++;
+            if (data.health?.gymDone) completed++;
+            if (data.health?.walkCompleted) completed++;
+            if (data.learning?.learningDone) completed++;
+            if (data.learning?.projectBuilding) completed++;
+            
+            const percent = Math.round((completed / total) * 100);
+            document.getElementById('progressPercent').textContent = percent + '%';
+            
+            // Update circle
+            const circle = document.getElementById('progressCircle');
+            const circumference = 175.9;
+            const offset = circumference - (percent / 100) * circumference;
+            circle.style.strokeDashoffset = offset;
+            
+            // Update streak display
+            document.getElementById('streakDisplay').textContent = appData.streak + ' 🔥';
+        }
+
+        function updateWeeklyProgress(completed) {
+            const today = new Date().getDay();
+            const dayIndex = today === 0 ? 6 : today - 1; // Monday = 0
+            appData.weeklyProgress[dayIndex] = completed;
+            renderWeeklyBar();
+        }
+
+        function renderWeeklyBar() {
+            const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+            const container = document.getElementById('weeklyBar');
+            container.innerHTML = '';
+            
+            let completedDays = 0;
+            
+            days.forEach((day, index) => {
+                const completed = appData.weeklyProgress[index];
+                if (completed) completedDays++;
+                
+                const div = document.createElement('div');
+                div.className = `flex-1 h-10 rounded-lg flex items-center justify-center font-bold text-sm transition-all ${completed ? 'bg-gradient-to-br from-purple-500 to-cyan-500 text-white' : 'bg-white/5 text-gray-500'}`;
+                div.textContent = day;
+                container.appendChild(div);
+            });
+            
+            document.getElementById('weeklyStats').textContent = `${completedDays}/7 days`;
+        }
+
+        function setupTradeToggle() {
+            const checkbox = document.getElementById('tradeTaken');
+            checkbox.addEventListener('change', (e) => {
+                const details = document.getElementById('tradeDetails');
+                if (e.target.checked) {
+                    details.classList.remove('hidden');
+                } else {
+                    details.classList.add('hidden');
+                }
+            });
+        }
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.remove('hidden');
+            
+            // Update tab buttons
+            document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('hover:bg-white/5');
+            });
+            
+            const activeBtn = document.getElementById('tab-' + tabName);
+            activeBtn.classList.add('tab-active');
+            activeBtn.classList.remove('hover:bg-white/5');
+            
+            // Render specific content
+            if (tabName === 'content') renderContentPlanner();
+            if (tabName === 'history') renderHistory();
+            if (tabName === 'ai') refreshAISuggestions();
+        }
+
+        function renderContentPlanner() {
+            const container = document.getElementById('contentPlanner');
+            container.innerHTML = '';
+            
+            appData.contentPlan.forEach((day, index) => {
+                const card = document.createElement('div');
+                card.className = `glass-card rounded-xl p-4 border transition-all cursor-pointer hover:border-purple-500/50 ${day.completed ? 'border-green-500/50 bg-green-500/5' : 'border-white/10'}`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <span class="text-xs font-bold text-gray-400 bg-white/10 px-2 py-1 rounded">Day ${day.day}</span>
+                        ${day.completed ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
+                    </div>
+                    <div class="space-y-2">
+                        <div>
+                            <p class="text-xs text-purple-400 font-semibold mb-1">HOOK</p>
+                            <p class="text-sm font-medium leading-tight" contenteditable="true" onblur="updateContentPlan(${index}, 'hook', this.innerText)">${day.hook}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-blue-400 font-semibold mb-1">TOPIC</p>
+                            <p class="text-sm text-gray-300" contenteditable="true" onblur="updateContentPlan(${index}, 'topic', this.innerText)">${day.topic}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-cyan-400 font-semibold mb-1">CTA</p>
+                            <p class="text-sm text-gray-400" contenteditable="true" onblur="updateContentPlan(${index}, 'cta', this.innerText)">${day.cta}</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleContentDay(${index})" class="mt-3 w-full py-2 rounded-lg text-xs font-medium transition-colors ${day.completed ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}">
+                        ${day.completed ? 'Completed' : 'Mark Complete'}
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateContentPlan(index, field, value) {
+            appData.contentPlan[index][field] = value;
+            saveData();
+        }
+
+        function toggleContentDay(index) {
+            appData.contentPlan[index].completed = !appData.contentPlan[index].completed;
+            saveData();
+            renderContentPlanner();
+        }
+
+        function generateTrendingIdeas() {
+            const trends = [
+                { title: "Solana Breakpoint Recap", category: "Events", engagement: "High" },
+                { title: "Jupiter Airdrop Strategy", category: "DeFi", engagement: "Viral" },
+                { title: "NFT Market Analysis", category: "Trading", engagement: "Medium" },
+                { title: "Web3 Onboarding UX", category: "Product", engagement: "High" },
+                { title: "Crypto Twitter Growth", category: "Marketing", engagement: "Viral" },
+                { title: "DAO Governance Models", category: "Community", engagement: "Medium" }
+            ];
+            
+            const container = document.getElementById('trendingIdeas');
+            container.innerHTML = '';
+            
+            trends.forEach(trend => {
+                const div = document.createElement('div');
+                div.className = 'bg-white/5 rounded-lg p-4 border border-white/10 hover:border-purple-500/50 transition-colors cursor-pointer';
+                div.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold text-purple-400">${trend.category}</span>
+                        <span class="text-xs ${trend.engagement === 'Viral' ? 'text-red-400' : 'text-green-400'}">${trend.engagement}</span>
+                    </div>
+                    <p class="font-medium text-sm">${trend.title}</p>
+                `;
+                container.appendChild(div);
+            });
+            
+            document.getElementById('trendingSection').classList.remove('hidden');
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+            const filter = document.getElementById('historyFilter').value;
+            container.innerHTML = '';
+            
+            const entries = Object.values(appData.history)
+                .filter(entry => entry.date !== appData.currentDate)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            if (entries.length === 0) {
+                document.getElementById('emptyHistory').classList.remove('hidden');
+                return;
+            }
+            
+            document.getElementById('emptyHistory').classList.add('hidden');
+            
+            entries.forEach(entry => {
+                if (filter === 'trading' && !entry.trading?.tradeTaken) return;
+                if (filter === 'completed' && !isDayCompleted(entry)) return;
+                
+                const completed = isDayCompleted(entry);
+                const card = document.createElement('div');
+                card.className = 'entry-card glass-card rounded-xl p-5 border border-white/10 hover:border-purple-500/30 transition-all relative group';
+                
+                let tradingInfo = '';
+                if (entry.trading?.tradeTaken) {
+                    tradingInfo = `<span class="text-xs ${entry.trading.result === 'win' ? 'text-green-400' : 'text-red-400'}">
+                        ${entry.trading.result === 'win' ? 'Win' : 'Loss'} ${entry.trading.rr ? `(${entry.trading.rr})` : ''}
+                    </span>`;
+                }
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-bold text-lg">${new Date(entry.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</h4>
+                            <div class="flex items-center space-x-2 mt-1">
+                                ${completed ? '<span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">All Tasks Complete</span>' : ''}
+                                ${tradingInfo}
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="editEntry('${entry.date}')" class="edit-btn p-2 hover:bg-white/10 rounded-lg text-blue-400" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteEntry('${entry.date}')" class="delete-btn p-2 hover:bg-red-500/20 rounded-lg text-red-400" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        ${renderHistoryItem('Trading', entry.trading?.tradeTaken, entry.trading?.result)}
+                        ${renderHistoryItem('Career', entry.career?.jobSearch && entry.career?.opportunities, `${entry.career?.dmsSent || 0} DMs`)}
+                        ${renderHistoryItem('Content', entry.content?.instagramReel && entry.content?.youtubeLive && entry.content?.tweetPosted)}
+                        ${renderHistoryItem('Health', entry.health?.gymDone && entry.health?.walkCompleted)}
+                        ${renderHistoryItem('Learning', entry.learning?.learningDone && entry.learning?.projectBuilding)}
+                    </div>
+                    
+                    ${entry.trading?.reason ? `<p class="mt-3 text-xs text-gray-500 italic">"${entry.trading.reason}"</p>` : ''}
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
+        function renderHistoryItem(label, completed, extra = '') {
+            return `
+                <div class="flex items-center space-x-2">
+                    <i class="fas ${completed ? 'fa-check-circle text-green-500' : 'fa-circle text-gray-600'} text-xs"></i>
+                    <span class="text-gray-400">${label}</span>
+                    ${extra ? `<span class="text-xs text-gray-500">${extra}</span>` : ''}
+                </div>
+            `;
+        }
+
+        function editEntry(date) {
+            currentEditDate = date;
+            const entry = appData.history[date];
+            const modal = document.getElementById('editModal');
+            const form = document.getElementById('editForm');
+            
+            form.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Trade Taken</label>
+                        <input type="checkbox" id="editTradeTaken" ${entry.trading?.tradeTaken ? 'checked' : ''} class="checkbox-custom">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Trade Result</label>
+                        <select id="editTradeResult" class="w-full px-3 py-2 rounded-lg text-sm">
+                            <option value="">Select</option>
+                            <option value="win" ${entry.trading?.result === 'win' ? 'selected' : ''}>Win</option>
+                            <option value="loss" ${entry.trading?.result === 'loss' ? 'selected' : ''}>Loss</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">RR Ratio</label>
+                    <input type="text" id="editTradeRR" value="${entry.trading?.rr || ''}" class="w-full px-3 py-2 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Trade Reason</label>
+                    <input type="text" id="editTradeReason" value="${entry.trading?.reason || ''}" class="w-full px-3 py-2 rounded-lg text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">DMs Sent</label>
+                        <input type="number" id="editDmsSent" value="${entry.career?.dmsSent || ''}" class="w-full px-3 py-2 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Water Intake</label>
+                        <input type="number" id="editWater" value="${entry.health?.waterIntake || ''}" class="w-full px-3 py-2 rounded-lg text-sm">
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function saveEdit() {
+            if (!currentEditDate) return;
+            
+            const entry = appData.history[currentEditDate];
+            if (!entry.trading) entry.trading = {};
+            if (!entry.career) entry.career = {};
+            if (!entry.health) entry.health = {};
+            
+            entry.trading.tradeTaken = document.getElementById('editTradeTaken').checked;
+            entry.trading.result = document.getElementById('editTradeResult').value;
+            entry.trading.rr = document.getElementById('editTradeRR').value;
+            entry.trading.reason = document.getElementById('editTradeReason').value;
+            entry.career.dmsSent = document.getElementById('editDmsSent').value;
+            entry.health.waterIntake = document.getElementById('editWater').value;
+            
+            saveData();
+            renderHistory();
+            closeEditModal();
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            currentEditDate = null;
+        }
+
+        function deleteEntry(date) {
+            if (confirm('Are you sure you want to delete this entry?')) {
+                delete appData.history[date];
+                saveData();
+                renderHistory();
+            }
+        }
+
+        function resetAllData() {
+            if (confirm('WARNING: This will delete ALL your data. Are you sure?')) {
+                localStorage.removeItem('growthOSData');
+                location.reload();
+            }
+        }
+
+        function refreshAISuggestions() {
+            const tips = [
+                "Focus on deep work: 90min blocks with no distractions",
+                "Use the 2-minute rule: If it takes <2min, do it now",
+                "Review your week every Sunday for 15 minutes",
+                "Batch your content creation: Film 3 reels in one session",
+                "Engage with 10 posts before posting your own"
+            ];
+            
+            const ideas = [
+                "Behind the scenes of a Web3 product launch",
+                "My morning routine as a Growth Lead",
+                "Analyzing successful NFT projects: What worked?",
+                "How to write copy that converts in crypto",
+                "The psychology of community building"
+            ];
+            
+            // Randomize
+            const shuffledTips = tips.sort(() => 0.5 - Math.random()).slice(0, 3);
+            const shuffledIdeas = ideas.sort(() => 0.5 - Math.random()).slice(0, 3);
+            
+            const tipsContainer = document.getElementById('productivityTips');
+            tipsContainer.innerHTML = shuffledTips.map(tip => `
+                <li class="flex items-start space-x-2">
+                    <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                    <span>${tip}</span>
+                </li>
+            `).join('');
+            
+            const ideasContainer = document.getElementById('contentIdeas');
+            ideasContainer.innerHTML = shuffledIdeas.map(idea => `
+                <li class="flex items-start space-x-2">
+                    <i class="fas fa-star text-yellow-500 mt-1"></i>
+                    <span>"${idea}"</span>
+                </li>
+            `).join('');
+        }
+
+        function showCompletionModal() {
+            const modal = document.getElementById('completionModal');
+            const content = document.getElementById('modalContent');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('completionModal');
+            const content = document.getElementById('modalContent');
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function triggerConfetti() {
+            const duration = 3000;
+            const end = Date.now() + duration;
+
+            (function frame() {
+                confetti({
+                    particleCount: 3,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#a855f7', '#3b82f6', '#06b6d4']
+                });
+                confetti({
+                    particleCount: 3,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#a855f7', '#3b82f6', '#06b6d4']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            }());
+        }
+
+        function updateDateDisplay() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
+            document.getElementById('currentDay').textContent = `Day ${Math.ceil((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24)} of ${now.getFullYear()}`;
+        }
+
+        function loadRandomQuote() {
+            const quote = appData.quotes[Math.floor(Math.random() * appData.quotes.length)];
+            document.getElementById('dailyQuote').textContent = `"${quote.text}"`;
+            document.getElementById('quoteAuthor').textContent = `— ${quote.author}`;
+        }
+
+        function renderAll() {
+            updateProgress();
+            renderWeeklyBar();
+        }
+
+        // Auto-save on page unload
+        window.addEventListener('beforeunload', () => {
+            saveDayToHistory();
+        });
+    </script>
+</body>
+</html>
