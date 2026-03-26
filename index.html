@@ -1,628 +1,1346 @@
-<script>
-    // Initialize data structure
-    let appData = {
-        currentDate: new Date().toISOString().split('T')[0],
-        streak: 0,
-        lastCompletedDate: null,
-        weeklyProgress: [false, false, false, false, false, false, false],
-        history: {},  // This stores past days (not today)
-        todayData: {}, // This stores today's data separately
-        contentPlan: generateDefaultContentPlan(),
-        quotes: [
-            { text: "Discipline is the bridge between goals and accomplishment.", author: "Jim Rohn" },
-            { text: "Success is the sum of small efforts, repeated day in and day out.", author: "Robert Collier" },
-            { text: "The future depends on what you do today.", author: "Mahatma Gandhi" }
-        ]
-    };
-
-    let currentEditDate = null;
-
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('GrowthOS initializing...');
-        loadData();
-        updateDateDisplay();
-        initializeTodayData();
-        renderAll();
-        loadRandomQuote();
-        refreshAISuggestions();
-        console.log('GrowthOS initialized! Data:', appData);
-    });
-
-    function generateDefaultContentPlan() {
-        const plan = [];
-        const topics = [
-            { hook: "Why 99% traders fail", topic: "Discipline in trading", cta: "Follow for real strategies" },
-            { hook: "I posted 50 reels — here's what happened", topic: "Consistency", cta: "Comment 'growth'" },
-            { hook: "Don't start Web3 like this", topic: "Beginner mistakes", cta: "Save this" },
-            { hook: "The truth about Solana NFTs", topic: "Market insights", cta: "RT if you agree" },
-            { hook: "How I 10x my productivity", topic: "Tools & systems", cta: "Thread below 🧵" },
-            { hook: "Web3 growth hacks that actually work", topic: "Growth strategies", cta: "Follow for more" },
-            { hook: "Why community > marketing", topic: "Community building", cta: "Share your thoughts" }
-        ];
-
-        for (let i = 1; i <= 30; i++) {
-            const topic = topics[(i - 1) % topics.length];
-            plan.push({
-                day: i,
-                hook: topic.hook,
-                topic: topic.topic,
-                cta: topic.cta,
-                completed: false
-            });
-        }
-        return plan;
-    }
-
-    function loadData() {
-        try {
-            const saved = localStorage.getItem('growthOSData');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                // Merge saved data with defaults
-                appData = { ...appData, ...parsed };
-                
-                // Check if it's a new day
-                const today = new Date().toISOString().split('T')[0];
-                if (appData.currentDate !== today) {
-                    // Save yesterday's data to history before switching
-                    if (appData.todayData && Object.keys(appData.todayData).length > 0) {
-                        appData.todayData.date = appData.currentDate;
-                        appData.history[appData.currentDate] = appData.todayData;
-                    }
-                    // Reset for new day
-                    appData.currentDate = today;
-                    appData.todayData = {};
-                }
-                
-                console.log('Data loaded from storage');
-            }
-        } catch (e) {
-            console.error('Error loading data:', e);
-        }
-    }
-
-    function saveData() {
-        try {
-            localStorage.setItem('growthOSData', JSON.stringify(appData));
-            console.log('Data saved to LocalStorage');
-        } catch (e) {
-            console.error('Error saving data:', e);
-        }
-    }
-
-    function handleTradeToggle(checked) {
-        const details = document.getElementById('tradeDetails');
-        if (checked) {
-            details.classList.remove('hidden');
-        } else {
-            details.classList.add('hidden');
-        }
-    }
-
-    function updateTask(category, field, value) {
-        const today = appData.currentDate;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrowthOS - Web3 Productivity Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; }
         
-        // Initialize today's data structure
-        if (!appData.todayData) {
-            appData.todayData = {};
+        body {
+            background: #0a0a0f !important;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(120, 58, 237, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%) !important;
+            color: #e5e7eb !important;
+            min-height: 100vh;
         }
         
-        if (!appData.todayData[category]) {
-            appData.todayData[category] = {};
+        .glass-card {
+            background: rgba(20, 20, 30, 0.6) !important;
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 1rem;
         }
         
-        // Save the value
-        appData.todayData[category][field] = value;
-        
-        // Save to localStorage immediately
-        saveData();
-        
-        // Update progress UI
-        updateProgress();
-        
-        // Check if all tasks completed
-        if (isDayCompleted(appData.todayData)) {
-            console.log('All tasks completed! Showing celebration...');
-            setTimeout(() => {
-                showCompletionModal();
-                triggerConfetti();
-                // Mark today in weekly progress
-                updateWeeklyProgress(true);
-            }, 500);
-        }
-    }
-
-    function isDayCompleted(data) {
-        if (!data) return false;
-        
-        const checks = [
-            data.trading?.tradeTaken,
-            data.career?.jobSearch,
-            data.career?.opportunities,
-            data.content?.instagramReel,
-            data.content?.youtubeLive,
-            data.content?.tweetPosted,
-            data.health?.gymDone,
-            data.health?.walkCompleted,
-            data.learning?.learningDone,
-            data.learning?.projectBuilding
-        ];
-        
-        return checks.every(check => check === true);
-    }
-
-    function updateProgress() {
-        const data = appData.todayData || {};
-        const total = 10;
-        let completed = 0;
-        
-        if (data.trading?.tradeTaken) completed++;
-        if (data.career?.jobSearch) completed++;
-        if (data.career?.opportunities) completed++;
-        if (data.content?.instagramReel) completed++;
-        if (data.content?.youtubeLive) completed++;
-        if (data.content?.tweetPosted) completed++;
-        if (data.health?.gymDone) completed++;
-        if (data.health?.walkCompleted) completed++;
-        if (data.learning?.learningDone) completed++;
-        if (data.learning?.projectBuilding) completed++;
-        
-        const percent = Math.round((completed / total) * 100);
-        document.getElementById('progressPercent').textContent = percent + '%';
-        
-        // Update circle
-        const circle = document.getElementById('progressCircle');
-        const circumference = 175.9;
-        const offset = circumference - (percent / 100) * circumference;
-        circle.style.strokeDashoffset = offset;
-        
-        // Update streak
-        document.getElementById('streakDisplay').textContent = appData.streak + ' 🔥';
-        
-        return percent;
-    }
-
-    function initializeTodayData() {
-        const data = appData.todayData || {};
-        
-        // Load trading data
-        if (data.trading) {
-            document.getElementById('tradeTaken').checked = data.trading.tradeTaken || false;
-            document.getElementById('tradeResult').value = data.trading.result || '';
-            document.getElementById('tradeRR').value = data.trading.rr || '';
-            document.getElementById('tradeReason').value = data.trading.reason || '';
-            if (data.trading.tradeTaken) {
-                document.getElementById('tradeDetails').classList.remove('hidden');
-            }
+        .gradient-text {
+            background: linear-gradient(135deg, #a855f7 0%, #3b82f6 50%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
-        // Load career data
-        if (data.career) {
-            document.getElementById('jobSearch').checked = data.career.jobSearch || false;
-            document.getElementById('dmsSent').value = data.career.dmsSent || '';
-            document.getElementById('opportunities').checked = data.career.opportunities || false;
+        .gradient-border {
+            position: relative;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.2));
+            padding: 1px;
+            border-radius: 1rem;
         }
         
-        // Load content data
-        if (data.content) {
-            document.getElementById('instagramReel').checked = data.content.instagramReel || false;
-            document.getElementById('youtubeLive').checked = data.content.youtubeLive || false;
-            document.getElementById('tweetPosted').checked = data.content.tweetPosted || false;
+        .gradient-border-inner {
+            background: rgba(20, 20, 30, 0.8) !important;
+            border-radius: calc(1rem - 1px);
+            height: 100%;
+            padding: 1.5rem;
         }
         
-        // Load health data
-        if (data.health) {
-            document.getElementById('gymDone').checked = data.health.gymDone || false;
-            document.getElementById('walkCompleted').checked = data.health.walkCompleted || false;
-            document.getElementById('waterIntake').value = data.health.waterIntake || '';
+        .checkbox-custom {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(168, 85, 247, 0.5);
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+            background: transparent;
+            flex-shrink: 0;
         }
         
-        // Load learning data
-        if (data.learning) {
-            document.getElementById('learningDone').checked = data.learning.learningDone || false;
-            document.getElementById('projectBuilding').checked = data.learning.projectBuilding || false;
+        .checkbox-custom:checked {
+            background: linear-gradient(135deg, #a855f7, #3b82f6);
+            border-color: transparent;
         }
         
-        // Update progress display
-        updateProgress();
-    }
-
-    function updateWeeklyProgress(completed) {
-        const today = new Date().getDay();
-        const dayIndex = today === 0 ? 6 : today - 1; // Monday = 0
-        appData.weeklyProgress[dayIndex] = completed;
-        renderWeeklyBar();
-        saveData();
-    }
-
-    function renderWeeklyBar() {
-        const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-        const container = document.getElementById('weeklyBar');
-        container.innerHTML = '';
+        .checkbox-custom:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
         
-        let completedDays = 0;
+        .tab-active {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(59, 130, 246, 0.2));
+            border: 1px solid rgba(168, 85, 247, 0.5);
+            color: white;
+        }
         
-        days.forEach((day, index) => {
-            const completed = appData.weeklyProgress[index];
-            if (completed) completedDays++;
-            
-            const div = document.createElement('div');
-            div.className = `flex-1 h-10 rounded-lg flex items-center justify-center font-bold text-sm transition-all ${completed ? 'bg-gradient-to-br from-purple-500 to-cyan-500 text-white' : 'bg-white/5 text-gray-500'}`;
-            div.textContent = day;
-            container.appendChild(div);
-        });
+        input[type="number"], input[type="text"], input[type="time"], select, textarea {
+            background: rgba(30, 30, 40, 0.8) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            width: 100%;
+        }
         
-        document.getElementById('weeklyStats').textContent = `${completedDays}/7 days`;
-    }
-
-    function switchTab(tabName) {
-        // Hide all tabs
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.add('hidden');
-        });
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
         
-        // Show selected tab
-        document.getElementById(tabName).classList.remove('hidden');
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #a855f7 !important;
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+        }
         
-        // Update tab buttons
-        document.querySelectorAll('[id^="tab-"]').forEach(btn => {
-            btn.classList.remove('tab-active');
-            btn.classList.add('hover:bg-white/5');
-        });
+        .streak-flame { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
         
-        const activeBtn = document.getElementById('tab-' + tabName);
-        activeBtn.classList.add('tab-active');
-        activeBtn.classList.remove('hover:bg-white/5');
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         
-        // Render specific content
-        if (tabName === 'content') renderContentPlanner();
-        if (tabName === 'history') renderHistory();
-        if (tabName === 'ai') refreshAISuggestions();
-    }
-
-    function renderContentPlanner() {
-        const container = document.getElementById('contentPlanner');
-        container.innerHTML = '';
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+        }
         
-        appData.contentPlan.forEach((day, index) => {
-            const card = document.createElement('div');
-            card.className = `glass-card rounded-xl p-4 border transition-all cursor-pointer hover:border-purple-500/50 ${day.completed ? 'border-green-500/50 bg-green-500/5' : 'border-white/10'}`;
-            card.innerHTML = `
-                <div class="flex justify-between items-start mb-3">
-                    <span class="text-xs font-bold text-gray-400 bg-white/10 px-2 py-1 rounded">Day ${day.day}</span>
-                    ${day.completed ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
-                </div>
-                <div class="space-y-2">
-                    <div>
-                        <p class="text-xs text-purple-400 font-semibold mb-1">HOOK</p>
-                        <p class="text-sm font-medium leading-tight text-gray-200" contenteditable="true" onblur="updateContentPlan(${index}, 'hook', this.innerText)">${day.hook}</p>
+        .delete-btn, .edit-btn { opacity: 0; transition: opacity 0.2s; }
+        .entry-card:hover .delete-btn, .entry-card:hover .edit-btn { opacity: 1; }
+        
+        .meeting-card {
+            background: rgba(168, 85, 247, 0.1);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .job-application-card {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .tweet-card {
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        ::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.5); border-radius: 4px; }
+    </style>
+</head>
+<body class="pb-20">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 glass-card border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
+                        <i class="fas fa-rocket text-white text-lg"></i>
                     </div>
                     <div>
-                        <p class="text-xs text-blue-400 font-semibold mb-1">TOPIC</p>
-                        <p class="text-sm text-gray-300" contenteditable="true" onblur="updateContentPlan(${index}, 'topic', this.innerText)">${day.topic}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-cyan-400 font-semibold mb-1">CTA</p>
-                        <p class="text-sm text-gray-400" contenteditable="true" onblur="updateContentPlan(${index}, 'cta', this.innerText)">${day.cta}</p>
+                        <h1 class="text-xl font-bold gradient-text brand-font">GrowthOS</h1>
+                        <p class="text-xs text-gray-400">Web3 Productivity</p>
                     </div>
                 </div>
-                <button onclick="toggleContentDay(${index})" class="mt-3 w-full py-2 rounded-lg text-xs font-medium transition-colors ${day.completed ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}">
-                    ${day.completed ? 'Completed' : 'Mark Complete'}
-                </button>
-            `;
-            container.appendChild(card);
-        });
-    }
-
-    function updateContentPlan(index, field, value) {
-        appData.contentPlan[index][field] = value;
-        saveData();
-    }
-
-    function toggleContentDay(index) {
-        appData.contentPlan[index].completed = !appData.contentPlan[index].completed;
-        saveData();
-        renderContentPlanner();
-    }
-
-    function generateTrendingIdeas() {
-        const trends = [
-            { title: "Solana Breakpoint Recap", category: "Events", engagement: "High" },
-            { title: "Jupiter Airdrop Strategy", category: "DeFi", engagement: "Viral" },
-            { title: "NFT Market Analysis", category: "Trading", engagement: "Medium" },
-            { title: "Web3 Onboarding UX", category: "Product", engagement: "High" },
-            { title: "Crypto Twitter Growth", category: "Marketing", engagement: "Viral" },
-            { title: "DAO Governance Models", category: "Community", engagement: "Medium" }
-        ];
-        
-        const container = document.getElementById('trendingIdeas');
-        container.innerHTML = '';
-        
-        trends.forEach(trend => {
-            const div = document.createElement('div');
-            div.className = 'bg-white/5 rounded-lg p-4 border border-white/10 hover:border-purple-500/50 transition-colors cursor-pointer';
-            div.innerHTML = `
-                <div class="flex justify-between items-start mb-2">
-                    <span class="text-xs font-bold text-purple-400">${trend.category}</span>
-                    <span class="text-xs ${trend.engagement === 'Viral' ? 'text-red-400' : 'text-green-400'}">${trend.engagement}</span>
+                <div class="flex items-center space-x-4">
+                    <div class="hidden md:flex items-center space-x-2 text-sm">
+                        <span class="text-gray-400">Streak:</span>
+                        <span class="text-orange-400 font-bold streak-flame" id="streakDisplay">0 🔥</span>
+                    </div>
+                    <button onclick="resetAllData()" class="p-2 hover:bg-white/10 rounded-lg transition-colors" title="Reset All">
+                        <i class="fas fa-trash-alt text-red-400"></i>
+                    </button>
                 </div>
-                <p class="font-medium text-sm text-gray-200">${trend.title}</p>
-            `;
-            container.appendChild(div);
-        });
-        
-        document.getElementById('trendingSection').classList.remove('hidden');
-    }
+            </div>
+        </div>
+    </nav>
 
-    function renderHistory() {
-        const container = document.getElementById('historyList');
-        const filter = document.getElementById('historyFilter').value;
-        container.innerHTML = '';
-        
-        // Get all history entries (excluding today)
-        const entries = Object.values(appData.history)
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
-        
-        console.log('Rendering history. Entries found:', entries.length, entries);
-        
-        if (entries.length === 0) {
-            document.getElementById('emptyHistory').classList.remove('hidden');
-            return;
-        }
-        
-        document.getElementById('emptyHistory').classList.add('hidden');
-        
-        entries.forEach(entry => {
-            if (filter === 'trading' && !entry.trading?.tradeTaken) return;
-            if (filter === 'completed' && !isDayCompleted(entry)) return;
-            
-            const completed = isDayCompleted(entry);
-            const card = document.createElement('div');
-            card.className = 'entry-card glass-card rounded-xl p-5 border border-white/10 hover:border-purple-500/30 transition-all relative group';
-            
-            let tradingInfo = '';
-            if (entry.trading?.tradeTaken) {
-                tradingInfo = `<span class="text-xs ${entry.trading.result === 'win' ? 'text-green-400' : 'text-red-400'}">
-                    ${entry.trading.result === 'win' ? 'Win' : 'Loss'} ${entry.trading.rr ? `(${entry.trading.rr})` : ''}
-                </span>`;
-            }
-            
-            card.innerHTML = `
-                <div class="flex justify-between items-start mb-3">
-                    <div>
-                        <h4 class="font-bold text-lg text-white">${new Date(entry.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</h4>
-                        <div class="flex items-center space-x-2 mt-1">
-                            ${completed ? '<span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">All Complete</span>' : ''}
-                            ${tradingInfo}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        <!-- Date & Progress -->
+        <div class="mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div>
+                    <h2 class="text-3xl font-bold mb-1 brand-font text-white" id="currentDate">Loading...</h2>
+                    <p class="text-gray-400" id="currentDay">Loading...</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-sm text-gray-400">Progress</p>
+                        <p class="text-2xl font-bold gradient-text" id="progressPercent">0%</p>
+                    </div>
+                    <div class="w-16 h-16 relative">
+                        <svg class="w-full h-full transform -rotate-90">
+                            <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.1)" stroke-width="4" fill="none"/>
+                            <circle id="progressCircle" cx="32" cy="32" r="28" stroke="url(#gradient)" stroke-width="4" fill="none" 
+                                stroke-dasharray="175.9" stroke-dashoffset="175.9" stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#a855f7" />
+                                    <stop offset="50%" stop-color="#3b82f6" />
+                                    <stop offset="100%" stop-color="#06b6d4" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 mb-6">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-sm font-medium text-gray-300">Weekly Progress</span>
+                    <span class="text-xs text-gray-400" id="weeklyStats">0/7 days</span>
+                </div>
+                <div class="flex space-x-2" id="weeklyBar"></div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex space-x-2 mb-6 overflow-x-auto pb-2">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-active px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap bg-white/5 text-gray-300 hover:bg-white/10">
+                <i class="fas fa-chart-line mr-2"></i>Dashboard
+            </button>
+            <button onclick="switchTab('meetings')" id="tab-meetings" class="px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-all whitespace-nowrap bg-white/5 text-gray-300">
+                <i class="fas fa-calendar-check mr-2"></i>Meetings
+            </button>
+            <button onclick="switchTab('jobs')" id="tab-jobs" class="px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-all whitespace-nowrap bg-white/5 text-gray-300">
+                <i class="fas fa-briefcase mr-2"></i>Job Applications
+            </button>
+            <button onclick="switchTab('tweets')" id="tab-tweets" class="px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-all whitespace-nowrap bg-white/5 text-gray-300">
+                <i class="fas fa-twitter mr-2"></i>Tweets
+            </button>
+            <button onclick="switchTab('content')" id="tab-content" class="px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-all whitespace-nowrap bg-white/5 text-gray-300">
+                <i class="fas fa-calendar-alt mr-2"></i>Content
+            </button>
+            <button onclick="switchTab('history')" id="tab-history" class="px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-all whitespace-nowrap bg-white/5 text-gray-300">
+                <i class="fas fa-history mr-2"></i>History
+            </button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content slide-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Trading -->
+                <div class="gradient-border rounded-2xl">
+                    <div class="gradient-border-inner">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                                    <i class="fas fa-chart-candlestick text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-bold brand-font text-white">Trading</h3>
+                            </div>
+                            <span class="text-xs text-gray-400 bg-white/5 px-3 py-1 rounded-full">Max 1-2 trades</span>
+                        </div>
+                        <div class="space-y-4">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="tradeTaken" onchange="handleTradeToggle(this.checked); updateTask('trading', 'tradeTaken', this.checked)">
+                                <span class="text-gray-300">Trade Taken</span>
+                            </label>
+                            <div id="tradeDetails" class="hidden space-y-3 pl-8">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <select id="tradeResult" onchange="updateTask('trading', 'result', this.value)" class="w-full text-sm">
+                                        <option value="">Result</option>
+                                        <option value="win">Win 🟢</option>
+                                        <option value="loss">Loss 🔴</option>
+                                    </select>
+                                    <input type="text" id="tradeRR" placeholder="RR Ratio" onchange="updateTask('trading', 'rr', this.value)" class="w-full text-sm">
+                                </div>
+                                <input type="text" id="tradeReason" placeholder="Reason..." onchange="updateTask('trading', 'reason', this.value)" class="w-full text-sm">
+                            </div>
                         </div>
                     </div>
-                    <div class="flex space-x-2">
-                        <button onclick="editEntry('${entry.date}')" class="edit-btn p-2 hover:bg-white/10 rounded-lg text-blue-400" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button onclick="deleteEntry('${entry.date}')" class="delete-btn p-2 hover:bg-red-500/20 rounded-lg text-red-400" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                </div>
+
+                <!-- Career -->
+                <div class="gradient-border rounded-2xl">
+                    <div class="gradient-border-inner">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                                <i class="fas fa-briefcase text-white"></i>
+                            </div>
+                            <h3 class="text-lg font-bold brand-font text-white">Career / Work</h3>
+                        </div>
+                        <div class="space-y-4">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="jobSearch" onchange="updateTask('career', 'jobSearch', this.checked)">
+                                <span class="text-gray-300">Job search done</span>
+                            </label>
+                            <div class="flex items-center space-x-3">
+                                <span class="text-gray-400 text-sm w-24">DMs sent:</span>
+                                <input type="number" id="dmsSent" min="0" onchange="updateTask('career', 'dmsSent', this.value)" class="w-20 text-sm text-center">
+                            </div>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="opportunities" onchange="updateTask('career', 'opportunities', this.checked)">
+                                <span class="text-gray-300">Opportunities explored</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                    ${renderHistoryItem('Trading', entry.trading?.tradeTaken, entry.trading?.result)}
-                    ${renderHistoryItem('Career', entry.career?.jobSearch && entry.career?.opportunities, `${entry.career?.dmsSent || 0} DMs`)}
-                    ${renderHistoryItem('Content', entry.content?.instagramReel && entry.content?.youtubeLive && entry.content?.tweetPosted)}
-                    ${renderHistoryItem('Health', entry.health?.gymDone && entry.health?.walkCompleted)}
-                    ${renderHistoryItem('Learning', entry.learning?.learningDone && entry.learning?.projectBuilding)}
+
+                <!-- Content -->
+                <div class="gradient-border rounded-2xl">
+                    <div class="gradient-border-inner">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
+                                <i class="fas fa-camera text-white"></i>
+                            </div>
+                            <h3 class="text-lg font-bold brand-font text-white">Content</h3>
+                        </div>
+                        <div class="space-y-3">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="instagramReel" onchange="updateTask('content', 'instagramReel', this.checked)">
+                                <span class="text-gray-300">Instagram Reel uploaded</span>
+                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="youtubeLive" onchange="updateTask('content', 'youtubeLive', this.checked)">
+                                <span class="text-gray-300">YouTube live / video</span>
+                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="tweetPosted" onchange="updateTask('content', 'tweetPosted', this.checked)">
+                                <span class="text-gray-300">Tweet posted</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
-                
-                ${entry.trading?.reason ? `<p class="mt-3 text-xs text-gray-500 italic">"${entry.trading.reason}"</p>` : ''}
-            `;
+
+                <!-- Health -->
+                <div class="gradient-border rounded-2xl">
+                    <div class="gradient-border-inner">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                                <i class="fas fa-heartbeat text-white"></i>
+                            </div>
+                            <h3 class="text-lg font-bold brand-font text-white">Health</h3>
+                        </div>
+                        <div class="space-y-3">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="gymDone" onchange="updateTask('health', 'gymDone', this.checked)">
+                                <span class="text-gray-300">Gym done</span>
+                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" class="checkbox-custom" id="walkCompleted" onchange="updateTask('health', 'walkCompleted', this.checked)">
+                                <span class="text-gray-300">Walk completed</span>
+                            </label>
+                            <div class="flex items-center space-x-3 pt-2">
+                                <span class="text-gray-400 text-sm w-24">Water:</span>
+                                <input type="number" id="waterIntake" min="0" onchange="updateTask('health', 'waterIntake', this.value)" class="w-20 text-sm text-center">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Learning -->
+                <div class="gradient-border rounded-2xl lg:col-span-2">
+                    <div class="gradient-border-inner">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+                                <i class="fas fa-brain text-white"></i>
+                            </div>
+                            <h3 class="text-lg font-bold brand-font text-white">Learning / Building</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label class="flex items-center space-x-3 cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-colors">
+                                <input type="checkbox" class="checkbox-custom" id="learningDone" onchange="updateTask('learning', 'learningDone', this.checked)">
+                                <span class="text-gray-300">Learning done</span>
+                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-colors">
+                                <input type="checkbox" class="checkbox-custom" id="projectBuilding" onchange="updateTask('learning', 'projectBuilding', this.checked)">
+                                <span class="text-gray-300">Project building</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quote -->
+            <div class="mt-8 glass-card rounded-2xl p-6 text-center">
+                <i class="fas fa-quote-left text-purple-500 text-2xl mb-3 opacity-50"></i>
+                <p class="text-lg italic text-gray-300 mb-2" id="dailyQuote">"Discipline is the bridge between goals and accomplishment."</p>
+                <p class="text-sm text-gray-500" id="quoteAuthor">— Jim Rohn</p>
+            </div>
+        </div>
+
+        <!-- Meetings Tab -->
+        <div id="meetings" class="tab-content hidden slide-in">
+            <div class="mb-6 flex justify-between items-center">
+                <h3 class="text-2xl font-bold gradient-text brand-font">Today's Meetings</h3>
+                <button onclick="openMeetingModal()" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg text-sm font-medium hover:opacity-90 text-white">
+                    <i class="fas fa-plus mr-2"></i>Add Meeting
+                </button>
+            </div>
             
-            container.appendChild(card);
-        });
-    }
-
-    function renderHistoryItem(label, completed, extra = '') {
-        return `
-            <div class="flex items-center space-x-2">
-                <i class="fas ${completed ? 'fa-check-circle text-green-500' : 'fa-circle text-gray-600'} text-xs"></i>
-                <span class="text-gray-400">${label}</span>
-                ${extra ? `<span class="text-xs text-gray-500">${extra}</span>` : ''}
+            <div id="meetingsList" class="space-y-4">
+                <p class="text-gray-500 text-center py-8">No meetings scheduled for today</p>
             </div>
-        `;
-    }
+        </div>
 
-    function editEntry(date) {
-        currentEditDate = date;
-        const entry = appData.history[date];
-        const modal = document.getElementById('editModal');
-        const form = document.getElementById('editForm');
-        
-        form.innerHTML = `
-            <div class="grid grid-cols-2 gap-4">
+        <!-- Job Applications Tab -->
+        <div id="jobs" class="tab-content hidden slide-in">
+            <div class="mb-6 flex justify-between items-center">
+                <h3 class="text-2xl font-bold gradient-text brand-font">Job Applications</h3>
+                <button onclick="openJobModal()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg text-sm font-medium hover:opacity-90 text-white">
+                    <i class="fas fa-plus mr-2"></i>Add Application
+                </button>
+            </div>
+            
+            <div id="jobsList" class="space-y-4">
+                <p class="text-gray-500 text-center py-8">No job applications added today</p>
+            </div>
+        </div>
+
+        <!-- Tweets Tab -->
+        <div id="tweets" class="tab-content hidden slide-in">
+            <div class="mb-6 flex justify-between items-center">
+                <h3 class="text-2xl font-bold gradient-text brand-font">Tweet Drafts & Posted</h3>
+                <button onclick="openTweetModal()" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg text-sm font-medium hover:opacity-90 text-white">
+                    <i class="fas fa-plus mr-2"></i>Add Tweet
+                </button>
+            </div>
+            
+            <div id="tweetsList" class="space-y-4">
+                <p class="text-gray-500 text-center py-8">No tweets added today</p>
+            </div>
+        </div>
+
+        <!-- Content Planner Tab -->
+        <div id="content" class="tab-content hidden slide-in">
+            <div class="mb-6 flex justify-between items-center">
+                <h3 class="text-2xl font-bold gradient-text brand-font">30-Day Content Strategy</h3>
+                <button onclick="generateTrendingIdeas()" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg text-sm font-medium hover:opacity-90 text-white">
+                    <i class="fas fa-magic mr-2"></i>Trending Ideas
+                </button>
+            </div>
+            <div id="trendingSection" class="hidden mb-8 glass-card rounded-2xl p-6 border border-purple-500/30">
+                <h4 class="text-lg font-bold mb-4 text-white"><i class="fas fa-fire text-orange-500 mr-2"></i>Trending This Week</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="trendingIdeas"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="contentPlanner"></div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history" class="tab-content hidden slide-in">
+            <div class="mb-6 flex justify-between items-center">
+                <h3 class="text-2xl font-bold gradient-text brand-font">Activity Journal</h3>
+                <select id="historyFilter" onchange="renderHistory()" class="px-4 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white">
+                    <option value="all">All Entries</option>
+                    <option value="trading">Trading Days</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <div class="space-y-4" id="historyList"></div>
+            <div id="emptyHistory" class="hidden text-center py-12 text-gray-500">
+                <i class="fas fa-calendar-times text-4xl mb-3 opacity-50"></i>
+                <p>No entries yet. Start completing tasks!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meeting Modal -->
+    <div id="meetingModal" class="fixed inset-0 z-50 hidden modal-overlay flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl p-6 max-w-lg w-full border border-purple-500/30">
+            <h3 class="text-xl font-bold mb-4 gradient-text brand-font">Add Meeting</h3>
+            <div class="space-y-4">
                 <div>
-                    <label class="block text-sm text-gray-400 mb-1">Trade Taken</label>
-                    <input type="checkbox" id="editTradeTaken" ${entry.trading?.tradeTaken ? 'checked' : ''} class="checkbox-custom">
+                    <label class="block text-sm text-gray-400 mb-1">Company/Person Name</label>
+                    <input type="text" id="meetingCompany" placeholder="e.g., Solana Foundation" class="w-full">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Time</label>
+                        <input type="time" id="meetingTime" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Platform</label>
+                        <select id="meetingPlatform" class="w-full">
+                            <option value="Zoom">Zoom</option>
+                            <option value="Google Meet">Google Meet</option>
+                            <option value="Discord">Discord</option>
+                            <option value="Twitter Space">Twitter Space</option>
+                            <option value="In Person">In Person</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-400 mb-1">Result</label>
-                    <select id="editTradeResult" class="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white">
-                        <option value="">Select</option>
-                        <option value="win" ${entry.trading?.result === 'win' ? 'selected' : ''}>Win</option>
-                        <option value="loss" ${entry.trading?.result === 'loss' ? 'selected' : ''}>Loss</option>
-                    </select>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">RR Ratio</label>
-                <input type="text" id="editTradeRR" value="${entry.trading?.rr || ''}" class="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white">
-            </div>
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Reason</label>
-                <input type="text" id="editTradeReason" value="${entry.trading?.reason || ''}" class="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white">
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1">DMs Sent</label>
-                    <input type="number" id="editDmsSent" value="${entry.career?.dmsSent || ''}" class="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white">
+                    <label class="block text-sm text-gray-400 mb-1">Meeting Link/Location</label>
+                    <input type="text" id="meetingLink" placeholder="https://..." class="w-full">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-400 mb-1">Water</label>
-                    <input type="number" id="editWater" value="${entry.health?.waterIntake || ''}" class="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white">
+                    <label class="block text-sm text-gray-400 mb-1">Notes</label>
+                    <textarea id="meetingNotes" placeholder="What was discussed..." class="w-full"></textarea>
                 </div>
             </div>
-        `;
-        
-        modal.classList.remove('hidden');
-    }
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeMeetingModal()" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
+                <button onclick="saveMeeting()" class="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg hover:opacity-90 text-white">Save Meeting</button>
+            </div>
+        </div>
+    </div>
 
-    function saveEdit() {
-        if (!currentEditDate) return;
-        
-        const entry = appData.history[currentEditDate];
-        if (!entry.trading) entry.trading = {};
-        if (!entry.career) entry.career = {};
-        if (!entry.health) entry.health = {};
-        
-        entry.trading.tradeTaken = document.getElementById('editTradeTaken').checked;
-        entry.trading.result = document.getElementById('editTradeResult').value;
-        entry.trading.rr = document.getElementById('editTradeRR').value;
-        entry.trading.reason = document.getElementById('editTradeReason').value;
-        entry.career.dmsSent = document.getElementById('editDmsSent').value;
-        entry.health.waterIntake = document.getElementById('editWater').value;
-        
-        saveData();
-        renderHistory();
-        closeEditModal();
-    }
+    <!-- Job Modal -->
+    <div id="jobModal" class="fixed inset-0 z-50 hidden modal-overlay flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl p-6 max-w-lg w-full border border-blue-500/30">
+            <h3 class="text-xl font-bold mb-4 gradient-text brand-font">Add Job Application</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Company Name</label>
+                    <input type="text" id="jobCompany" placeholder="e.g., Coinbase" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Position/Role</label>
+                    <input type="text" id="jobPosition" placeholder="e.g., Web3 Growth Lead" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Founder/Contact Name</label>
+                    <input type="text" id="jobFounder" placeholder="e.g., John Doe (@johndoe)" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Application Link</label>
+                    <input type="text" id="jobLink" placeholder="https://..." class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Notes</label>
+                    <textarea id="jobNotes" placeholder="Applied via LinkedIn, referral from..." class="w-full"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeJobModal()" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
+                <button onclick="saveJob()" class="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg hover:opacity-90 text-white">Save Application</button>
+            </div>
+        </div>
+    </div>
 
-    function closeEditModal() {
-        document.getElementById('editModal').classList.add('hidden');
-        currentEditDate = null;
-    }
+    <!-- Tweet Modal -->
+    <div id="tweetModal" class="fixed inset-0 z-50 hidden modal-overlay flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl p-6 max-w-lg w-full border border-cyan-500/30">
+            <h3 class="text-xl font-bold mb-4 gradient-text brand-font">Add Tweet</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Tweet Content</label>
+                    <textarea id="tweetContent" placeholder="Write your tweet here..." class="w-full" rows="4"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Topic/Theme</label>
+                    <input type="text" id="tweetTopic" placeholder="e.g., Solana, Web3 Growth" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Scheduled Time (optional)</label>
+                    <input type="time" id="tweetTime" class="w-full">
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="tweetPosted" class="checkbox-custom">
+                    <label for="tweetPosted" class="text-gray-300">Already Posted</label>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeTweetModal()" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
+                <button onclick="saveTweet()" class="px-6 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg hover:opacity-90 text-white">Save Tweet</button>
+            </div>
+        </div>
+    </div>
 
-    function deleteEntry(date) {
-        if (confirm('Delete this entry?')) {
-            delete appData.history[date];
-            saveData();
-            renderHistory();
-        }
-    }
+    <!-- Completion Modal -->
+    <div id="completionModal" class="fixed inset-0 z-50 hidden modal-overlay flex items-center justify-center p-4">
+        <div class="glass-card rounded-3xl p-8 max-w-md w-full text-center border border-green-500/30 transform scale-95 opacity-0 transition-all duration-300" id="modalContent">
+            <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
+                <i class="fas fa-check text-3xl text-white"></i>
+            </div>
+            <h3 class="text-2xl font-bold mb-2 gradient-text brand-font">Congratulations! 🎉</h3>
+            <p class="text-gray-300 mb-2">Today's tasks completed.</p>
+            <p class="text-lg font-semibold text-green-400 mb-6">Now you are free to relax.</p>
+            <div class="flex justify-center space-x-4">
+                <button onclick="closeModal()" class="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white">Close</button>
+                <button onclick="switchTab('history'); closeModal();" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl hover:opacity-90 text-white">View History</button>
+            </div>
+        </div>
+    </div>
 
-    function resetAllData() {
-        if (confirm('WARNING: Delete ALL data?')) {
-            localStorage.removeItem('growthOSData');
-            location.reload();
-        }
-    }
+    <!-- JAVASCRIPT -->
+    <script>
+        // Data Structure
+        let appData = {
+            currentDate: new Date().toISOString().split('T')[0],
+            streak: 0,
+            lastCompletedDate: null,
+            weeklyProgress: [false, false, false, false, false, false, false],
+            history: {},
+            todayData: {
+                tasks: {},
+                meetings: [],
+                jobs: [],
+                tweets: []
+            },
+            contentPlan: generateDefaultContentPlan(),
+            quotes: [
+                { text: "Discipline is the bridge between goals and accomplishment.", author: "Jim Rohn" },
+                { text: "Success is the sum of small efforts, repeated day in and day out.", author: "Robert Collier" },
+                { text: "The future depends on what you do today.", author: "Mahatma Gandhi" }
+            ]
+        };
 
-    function refreshAISuggestions() {
-        const tips = [
-            "Focus on deep work: 90min blocks with no distractions",
-            "Use the 2-minute rule: If it takes <2min, do it now",
-            "Review your week every Sunday for 15 minutes",
-            "Batch your content creation: Film 3 reels in one session",
-            "Engage with 10 posts before posting your own"
-        ];
-        
-        const ideas = [
-            "Behind the scenes of a Web3 product launch",
-            "My morning routine as a Growth Lead",
-            "Analyzing successful NFT projects: What worked?",
-            "How to write copy that converts in crypto",
-            "The psychology of community building"
-        ];
-        
-        const shuffledTips = tips.sort(() => 0.5 - Math.random()).slice(0, 3);
-        const shuffledIdeas = ideas.sort(() => 0.5 - Math.random()).slice(0, 3);
-        
-        const tipsContainer = document.getElementById('productivityTips');
-        tipsContainer.innerHTML = shuffledTips.map(tip => `
-            <li class="flex items-start space-x-2">
-                <i class="fas fa-check-circle text-green-500 mt-1"></i>
-                <span>${tip}</span>
-            </li>
-        `).join('');
-        
-        const ideasContainer = document.getElementById('contentIdeas');
-        ideasContainer.innerHTML = shuffledIdeas.map(idea => `
-            <li class="flex items-start space-x-2">
-                <i class="fas fa-star text-yellow-500 mt-1"></i>
-                <span>"${idea}"</span>
-            </li>
-        `).join('');
-    }
+        let currentEditDate = null;
+        let currentEditIndex = null;
+        let currentEditType = null;
 
-    function showCompletionModal() {
-        const modal = document.getElementById('completionModal');
-        const content = document.getElementById('modalContent');
-        modal.classList.remove('hidden');
-        setTimeout(() => {
-            content.classList.remove('scale-95', 'opacity-0');
-            content.classList.add('scale-100', 'opacity-100');
-        }, 10);
-    }
-
-    function closeModal() {
-        const modal = document.getElementById('completionModal');
-        const content = document.getElementById('modalContent');
-        content.classList.remove('scale-100', 'opacity-100');
-        content.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-        }, 300);
-    }
-
-    function triggerConfetti() {
-        const duration = 3000;
-        const end = Date.now() + duration;
-
-        (function frame() {
-            confetti({
-                particleCount: 3,
-                angle: 60,
-                spread: 55,
-                origin: { x: 0 },
-                colors: ['#a855f7', '#3b82f6', '#06b6d4']
-            });
-            confetti({
-                particleCount: 3,
-                angle: 120,
-                spread: 55,
-                origin: { x: 1 },
-                colors: ['#a855f7', '#3b82f6', '#06b6d4']
-            });
-
-            if (Date.now() < end) {
-                requestAnimationFrame(frame);
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('GrowthOS initializing...');
+            try {
+                loadData();
+                updateDateDisplay();
+                initializeTodayData();
+                renderAll();
+                loadRandomQuote();
+                renderMeetings();
+                renderJobs();
+                renderTweets();
+                console.log('GrowthOS initialized successfully!');
+            } catch (e) {
+                console.error('Initialization error:', e);
             }
-        }());
-    }
+        });
 
-    function updateDateDisplay() {
-        const now = new Date();
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
-        document.getElementById('currentDay').textContent = `Day ${Math.ceil((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24)} of ${now.getFullYear()}`;
-    }
+        function generateDefaultContentPlan() {
+            const plan = [];
+            const topics = [
+                { hook: "Why 99% traders fail", topic: "Discipline in trading", cta: "Follow for real strategies" },
+                { hook: "I posted 50 reels — here's what happened", topic: "Consistency", cta: "Comment 'growth'" },
+                { hook: "Don't start Web3 like this", topic: "Beginner mistakes", cta: "Save this" },
+                { hook: "The truth about Solana NFTs", topic: "Market insights", cta: "RT if you agree" },
+                { hook: "How I 10x my productivity", topic: "Tools & systems", cta: "Thread below 🧵" },
+                { hook: "Web3 growth hacks that actually work", topic: "Growth strategies", cta: "Follow for more" },
+                { hook: "Why community > marketing", topic: "Community building", cta: "Share your thoughts" }
+            ];
 
-    function loadRandomQuote() {
-        const quote = appData.quotes[Math.floor(Math.random() * appData.quotes.length)];
-        document.getElementById('dailyQuote').textContent = `"${quote.text}"`;
-        document.getElementById('quoteAuthor').textContent = `— ${quote.author}`;
-    }
+            for (let i = 1; i <= 30; i++) {
+                const topic = topics[(i - 1) % topics.length];
+                plan.push({
+                    day: i,
+                    hook: topic.hook,
+                    topic: topic.topic,
+                    cta: topic.cta,
+                    completed: false
+                });
+            }
+            return plan;
+        }
 
-    function renderAll() {
-        updateProgress();
-        renderWeeklyBar();
-    }
+        function loadData() {
+            try {
+                const saved = localStorage.getItem('growthOSData');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    const today = new Date().toISOString().split('T')[0];
+                    
+                    // Check if new day
+                    if (parsed.currentDate !== today) {
+                        // Move yesterday's data to history
+                        if (parsed.todayData && (parsed.todayData.tasks || parsed.todayData.meetings?.length > 0 || parsed.todayData.jobs?.length > 0)) {
+                            parsed.history[parsed.currentDate] = {...parsed.todayData};
+                        }
+                        parsed.currentDate = today;
+                        parsed.todayData = { tasks: {}, meetings: [], jobs: [], tweets: [] };
+                    }
+                    
+                    appData = {...appData, ...parsed};
+                    console.log('Data loaded:', appData);
+                }
+            } catch (e) {
+                console.error('Error loading data:', e);
+            }
+        }
 
-    // Save today's data to history when leaving page
-    window.addEventListener('beforeunload', function() {
-        if (appData.todayData && Object.keys(appData.todayData).length > 0) {
-            appData.todayData.date = appData.currentDate;
-            appData.history[appData.currentDate] = {...appData.todayData};
+        function saveData() {
+            try {
+                localStorage.setItem('growthOSData', JSON.stringify(appData));
+                console.log('Data saved');
+            } catch (e) {
+                console.error('Error saving data:', e);
+            }
+        }
+
+        function handleTradeToggle(checked) {
+            const details = document.getElementById('tradeDetails');
+            if (checked) {
+                details.classList.remove('hidden');
+            } else {
+                details.classList.add('hidden');
+            }
+        }
+
+        function updateTask(category, field, value) {
+            if (!appData.todayData.tasks[category]) {
+                appData.todayData.tasks[category] = {};
+            }
+            appData.todayData.tasks[category][field] = value;
+            saveData();
+            updateProgress();
+            
+            if (isDayCompleted()) {
+                setTimeout(() => {
+                    showCompletionModal();
+                    triggerConfetti();
+                    updateWeeklyProgress(true);
+                }, 500);
+            }
+        }
+
+        function isDayCompleted() {
+            const data = appData.todayData.tasks;
+            const checks = [
+                data.trading?.tradeTaken,
+                data.career?.jobSearch,
+                data.career?.opportunities,
+                data.content?.instagramReel,
+                data.content?.youtubeLive,
+                data.content?.tweetPosted,
+                data.health?.gymDone,
+                data.health?.walkCompleted,
+                data.learning?.learningDone,
+                data.learning?.projectBuilding
+            ];
+            return checks.every(check => check === true);
+        }
+
+        function updateProgress() {
+            const data = appData.todayData.tasks || {};
+            let completed = 0;
+            const checks = [
+                data.trading?.tradeTaken,
+                data.career?.jobSearch,
+                data.career?.opportunities,
+                data.content?.instagramReel,
+                data.content?.youtubeLive,
+                data.content?.tweetPosted,
+                data.health?.gymDone,
+                data.health?.walkCompleted,
+                data.learning?.learningDone,
+                data.learning?.projectBuilding
+            ];
+            checks.forEach(c => { if (c) completed++; });
+            
+            const percent = Math.round((completed / 10) * 100);
+            const progressEl = document.getElementById('progressPercent');
+            const circleEl = document.getElementById('progressCircle');
+            
+            if (progressEl) progressEl.textContent = percent + '%';
+            if (circleEl) {
+                const circumference = 175.9;
+                circleEl.style.strokeDashoffset = circumference - (percent / 100) * circumference;
+            }
+            
+            const streakEl = document.getElementById('streakDisplay');
+            if (streakEl) streakEl.textContent = appData.streak + ' 🔥';
+        }
+
+        function initializeTodayData() {
+            const data = appData.todayData.tasks || {};
+            
+            // Trading
+            if (data.trading) {
+                const el = document.getElementById('tradeTaken');
+                if (el) {
+                    el.checked = data.trading.tradeTaken || false;
+                    if (data.trading.tradeTaken) handleTradeToggle(true);
+                }
+                const res = document.getElementById('tradeResult');
+                if (res) res.value = data.trading.result || '';
+                const rr = document.getElementById('tradeRR');
+                if (rr) rr.value = data.trading.rr || '';
+                const reason = document.getElementById('tradeReason');
+                if (reason) reason.value = data.trading.reason || '';
+            }
+            
+            // Career
+            if (data.career) {
+                const el = document.getElementById('jobSearch');
+                if (el) el.checked = data.career.jobSearch || false;
+                const dms = document.getElementById('dmsSent');
+                if (dms) dms.value = data.career.dmsSent || '';
+                const opp = document.getElementById('opportunities');
+                if (opp) opp.checked = data.career.opportunities || false;
+            }
+            
+            // Content
+            if (data.content) {
+                const ig = document.getElementById('instagramReel');
+                if (ig) ig.checked = data.content.instagramReel || false;
+                const yt = document.getElementById('youtubeLive');
+                if (yt) yt.checked = data.content.youtubeLive || false;
+                const tw = document.getElementById('tweetPosted');
+                if (tw) tw.checked = data.content.tweetPosted || false;
+            }
+            
+            // Health
+            if (data.health) {
+                const gym = document.getElementById('gymDone');
+                if (gym) gym.checked = data.health.gymDone || false;
+                const walk = document.getElementById('walkCompleted');
+                if (walk) walk.checked = data.health.walkCompleted || false;
+                const water = document.getElementById('waterIntake');
+                if (water) water.value = data.health.waterIntake || '';
+            }
+            
+            // Learning
+            if (data.learning) {
+                const learn = document.getElementById('learningDone');
+                if (learn) learn.checked = data.learning.learningDone || false;
+                const proj = document.getElementById('projectBuilding');
+                if (proj) proj.checked = data.learning.projectBuilding || false;
+            }
+        }
+
+        function updateWeeklyProgress(completed) {
+            const today = new Date().getDay();
+            const dayIndex = today === 0 ? 6 : today - 1;
+            appData.weeklyProgress[dayIndex] = completed;
+            renderWeeklyBar();
             saveData();
         }
-    });
-</script>
+
+        function renderWeeklyBar() {
+            const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+            const container = document.getElementById('weeklyBar');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            let completedDays = 0;
+            
+            days.forEach((day, index) => {
+                const completed = appData.weeklyProgress[index];
+                if (completed) completedDays++;
+                
+                const div = document.createElement('div');
+                div.className = `flex-1 h-10 rounded-lg flex items-center justify-center font-bold text-sm transition-all ${completed ? 'bg-gradient-to-br from-purple-500 to-cyan-500 text-white' : 'bg-white/5 text-gray-500'}`;
+                div.textContent = day;
+                container.appendChild(div);
+            });
+            
+            const statsEl = document.getElementById('weeklyStats');
+            if (statsEl) statsEl.textContent = `${completedDays}/7 days`;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            const tabEl = document.getElementById(tabName);
+            if (tabEl) tabEl.classList.remove('hidden');
+            
+            document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('hover:bg-white/5');
+            });
+            
+            const activeBtn = document.getElementById('tab-' + tabName);
+            if (activeBtn) {
+                activeBtn.classList.add('tab-active');
+                activeBtn.classList.remove('hover:bg-white/5');
+            }
+            
+            if (tabName === 'content') renderContentPlanner();
+            if (tabName === 'history') renderHistory();
+            if (tabName === 'meetings') renderMeetings();
+            if (tabName === 'jobs') renderJobs();
+            if (tabName === 'tweets') renderTweets();
+        }
+
+        // MEETINGS FUNCTIONS
+        function openMeetingModal(index = null) {
+            currentEditIndex = index;
+            const modal = document.getElementById('meetingModal');
+            
+            if (index !== null && appData.todayData.meetings[index]) {
+                const m = appData.todayData.meetings[index];
+                document.getElementById('meetingCompany').value = m.company || '';
+                document.getElementById('meetingTime').value = m.time || '';
+                document.getElementById('meetingPlatform').value = m.platform || 'Zoom';
+                document.getElementById('meetingLink').value = m.link || '';
+                document.getElementById('meetingNotes').value = m.notes || '';
+            } else {
+                document.getElementById('meetingCompany').value = '';
+                document.getElementById('meetingTime').value = '';
+                document.getElementById('meetingPlatform').value = 'Zoom';
+                document.getElementById('meetingLink').value = '';
+                document.getElementById('meetingNotes').value = '';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeMeetingModal() {
+            document.getElementById('meetingModal').classList.add('hidden');
+            currentEditIndex = null;
+        }
+
+        function saveMeeting() {
+            const meeting = {
+                company: document.getElementById('meetingCompany').value,
+                time: document.getElementById('meetingTime').value,
+                platform: document.getElementById('meetingPlatform').value,
+                link: document.getElementById('meetingLink').value,
+                notes: document.getElementById('meetingNotes').value
+            };
+            
+            if (currentEditIndex !== null) {
+                appData.todayData.meetings[currentEditIndex] = meeting;
+            } else {
+                appData.todayData.meetings.push(meeting);
+            }
+            
+            saveData();
+            renderMeetings();
+            closeMeetingModal();
+        }
+
+        function renderMeetings() {
+            const container = document.getElementById('meetingsList');
+            if (!container) return;
+            
+            if (appData.todayData.meetings.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No meetings scheduled for today</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            appData.todayData.meetings.forEach((meeting, index) => {
+                const div = document.createElement('div');
+                div.className = 'meeting-card';
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-bold text-white text-lg">${meeting.company}</h4>
+                            <p class="text-purple-400 text-sm"><i class="far fa-clock mr-1"></i>${meeting.time || 'No time set'} | <i class="fas fa-video mr-1"></i>${meeting.platform}</p>
+                            ${meeting.link ? `<a href="${meeting.link}" target="_blank" class="text-blue-400 text-sm hover:underline"><i class="fas fa-link mr-1"></i>Join Meeting</a>` : ''}
+                            ${meeting.notes ? `<p class="text-gray-400 text-sm mt-2">${meeting.notes}</p>` : ''}
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="openMeetingModal(${index})" class="p-2 hover:bg-white/10 rounded text-blue-400"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteMeeting(${index})" class="p-2 hover:bg-red-500/20 rounded text-red-400"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function deleteMeeting(index) {
+            if (confirm('Delete this meeting?')) {
+                appData.todayData.meetings.splice(index, 1);
+                saveData();
+                renderMeetings();
+            }
+        }
+
+        // JOB APPLICATIONS FUNCTIONS
+        function openJobModal(index = null) {
+            currentEditIndex = index;
+            const modal = document.getElementById('jobModal');
+            
+            if (index !== null && appData.todayData.jobs[index]) {
+                const j = appData.todayData.jobs[index];
+                document.getElementById('jobCompany').value = j.company || '';
+                document.getElementById('jobPosition').value = j.position || '';
+                document.getElementById('jobFounder').value = j.founder || '';
+                document.getElementById('jobLink').value = j.link || '';
+                document.getElementById('jobNotes').value = j.notes || '';
+            } else {
+                document.getElementById('jobCompany').value = '';
+                document.getElementById('jobPosition').value = '';
+                document.getElementById('jobFounder').value = '';
+                document.getElementById('jobLink').value = '';
+                document.getElementById('jobNotes').value = '';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeJobModal() {
+            document.getElementById('jobModal').classList.add('hidden');
+            currentEditIndex = null;
+        }
+
+        function saveJob() {
+            const job = {
+                company: document.getElementById('jobCompany').value,
+                position: document.getElementById('jobPosition').value,
+                founder: document.getElementById('jobFounder').value,
+                link: document.getElementById('jobLink').value,
+                notes: document.getElementById('jobNotes').value
+            };
+            
+            if (currentEditIndex !== null) {
+                appData.todayData.jobs[currentEditIndex] = job;
+            } else {
+                appData.todayData.jobs.push(job);
+            }
+            
+            saveData();
+            renderJobs();
+            closeJobModal();
+        }
+
+        function renderJobs() {
+            const container = document.getElementById('jobsList');
+            if (!container) return;
+            
+            if (appData.todayData.jobs.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No job applications added today</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            appData.todayData.jobs.forEach((job, index) => {
+                const div = document.createElement('div');
+                div.className = 'job-application-card';
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-bold text-white text-lg">${job.company}</h4>
+                            <p class="text-blue-400 text-sm font-medium">${job.position}</p>
+                            ${job.founder ? `<p class="text-gray-400 text-sm"><i class="fas fa-user mr-1"></i>Contact: ${job.founder}</p>` : ''}
+                            ${job.link ? `<a href="${job.link}" target="_blank" class="text-cyan-400 text-sm hover:underline"><i class="fas fa-external-link-alt mr-1"></i>View Application</a>` : ''}
+                            ${job.notes ? `<p class="text-gray-500 text-sm mt-2">${job.notes}</p>` : ''}
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="openJobModal(${index})" class="p-2 hover:bg-white/10 rounded text-blue-400"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteJob(${index})" class="p-2 hover:bg-red-500/20 rounded text-red-400"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function deleteJob(index) {
+            if (confirm('Delete this application?')) {
+                appData.todayData.jobs.splice(index, 1);
+                saveData();
+                renderJobs();
+            }
+        }
+
+        // TWEETS FUNCTIONS
+        function openTweetModal(index = null) {
+            currentEditIndex = index;
+            const modal = document.getElementById('tweetModal');
+            
+            if (index !== null && appData.todayData.tweets[index]) {
+                const t = appData.todayData.tweets[index];
+                document.getElementById('tweetContent').value = t.content || '';
+                document.getElementById('tweetTopic').value = t.topic || '';
+                document.getElementById('tweetTime').value = t.time || '';
+                document.getElementById('tweetPosted').checked = t.posted || false;
+            } else {
+                document.getElementById('tweetContent').value = '';
+                document.getElementById('tweetTopic').value = '';
+                document.getElementById('tweetTime').value = '';
+                document.getElementById('tweetPosted').checked = false;
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeTweetModal() {
+            document.getElementById('tweetModal').classList.add('hidden');
+            currentEditIndex = null;
+        }
+
+        function saveTweet() {
+            const tweet = {
+                content: document.getElementById('tweetContent').value,
+                topic: document.getElementById('tweetTopic').value,
+                time: document.getElementById('tweetTime').value,
+                posted: document.getElementById('tweetPosted').checked
+            };
+            
+            if (currentEditIndex !== null) {
+                appData.todayData.tweets[currentEditIndex] = tweet;
+            } else {
+                appData.todayData.tweets.push(tweet);
+            }
+            
+            saveData();
+            renderTweets();
+            closeTweetModal();
+        }
+
+        function renderTweets() {
+            const container = document.getElementById('tweetsList');
+            if (!container) return;
+            
+            if (appData.todayData.tweets.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No tweets added today</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            appData.todayData.tweets.forEach((tweet, index) => {
+                const div = document.createElement('div');
+                div.className = 'tweet-card';
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <span class="text-xs font-bold text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded">${tweet.topic || 'General'}</span>
+                                ${tweet.posted ? '<span class="text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded"><i class="fas fa-check mr-1"></i>Posted</span>' : '<span class="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded">Draft</span>'}
+                                ${tweet.time ? `<span class="text-xs text-gray-400"><i class="far fa-clock mr-1"></i>${tweet.time}</span>` : ''}
+                            </div>
+                            <p class="text-gray-200 text-sm whitespace-pre-wrap">${tweet.content}</p>
+                        </div>
+                        <div class="flex space-x-2 ml-4">
+                            <button onclick="openTweetModal(${index})" class="p-2 hover:bg-white/10 rounded text-blue-400"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteTweet(${index})" class="p-2 hover:bg-red-500/20 rounded text-red-400"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function deleteTweet(index) {
+            if (confirm('Delete this tweet?')) {
+                appData.todayData.tweets.splice(index, 1);
+                saveData();
+                renderTweets();
+            }
+        }
+
+        // CONTENT PLANNER
+        function renderContentPlanner() {
+            const container = document.getElementById('contentPlanner');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            appData.contentPlan.forEach((day, index) => {
+                const card = document.createElement('div');
+                card.className = `glass-card rounded-xl p-4 border transition-all cursor-pointer hover:border-purple-500/50 ${day.completed ? 'border-green-500/50 bg-green-500/5' : 'border-white/10'}`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <span class="text-xs font-bold text-gray-400 bg-white/10 px-2 py-1 rounded">Day ${day.day}</span>
+                        ${day.completed ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
+                    </div>
+                    <div class="space-y-2">
+                        <div>
+                            <p class="text-xs text-purple-400 font-semibold mb-1">HOOK</p>
+                            <p class="text-sm font-medium leading-tight text-gray-200" contenteditable="true" onblur="updateContentPlan(${index}, 'hook', this.innerText)">${day.hook}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-blue-400 font-semibold mb-1">TOPIC</p>
+                            <p class="text-sm text-gray-300" contenteditable="true" onblur="updateContentPlan(${index}, 'topic', this.innerText)">${day.topic}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-cyan-400 font-semibold mb-1">CTA</p>
+                            <p class="text-sm text-gray-400" contenteditable="true" onblur="updateContentPlan(${index}, 'cta', this.innerText)">${day.cta}</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleContentDay(${index})" class="mt-3 w-full py-2 rounded-lg text-xs font-medium transition-colors ${day.completed ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}">
+                        ${day.completed ? 'Completed' : 'Mark Complete'}
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateContentPlan(index, field, value) {
+            appData.contentPlan[index][field] = value;
+            saveData();
+        }
+
+        function toggleContentDay(index) {
+            appData.contentPlan[index].completed = !appData.contentPlan[index].completed;
+            saveData();
+            renderContentPlanner();
+        }
+
+        function generateTrendingIdeas() {
+            const trends = [
+                { title: "Solana Breakpoint Recap", category: "Events", engagement: "High" },
+                { title: "Jupiter Airdrop Strategy", category: "DeFi", engagement: "Viral" },
+                { title: "NFT Market Analysis", category: "Trading", engagement: "Medium" },
+                { title: "Web3 Onboarding UX", category: "Product", engagement: "High" },
+                { title: "Crypto Twitter Growth", category: "Marketing", engagement: "Viral" },
+                { title: "DAO Governance Models", category: "Community", engagement: "Medium" }
+            ];
+            
+            const container = document.getElementById('trendingIdeas');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            trends.forEach(trend => {
+                const div = document.createElement('div');
+                div.className = 'bg-white/5 rounded-lg p-4 border border-white/10 hover:border-purple-500/50 transition-colors cursor-pointer';
+                div.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold text-purple-400">${trend.category}</span>
+                        <span class="text-xs ${trend.engagement === 'Viral' ? 'text-red-400' : 'text-green-400'}">${trend.engagement}</span>
+                    </div>
+                    <p class="font-medium text-sm text-gray-200">${trend.title}</p>
+                `;
+                container.appendChild(div);
+            });
+            
+            document.getElementById('trendingSection').classList.remove('hidden');
+        }
+
+        // HISTORY
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+            const filter = document.getElementById('historyFilter')?.value || 'all';
+            
+            if (!container) return;
+            
+            const entries = Object.entries(appData.history)
+                .sort((a, b) => new Date(b[0]) - new Date(a[0]));
+            
+            if (entries.length === 0) {
+                container.innerHTML = '';
+                document.getElementById('emptyHistory')?.classList.remove('hidden');
+                return;
+            }
+            
+            document.getElementById('emptyHistory')?.classList.add('hidden');
+            container.innerHTML = '';
+            
+            entries.forEach(([date, data]) => {
+                // Filter logic here if needed
+                const card = document.createElement('div');
+                card.className = 'entry-card glass-card rounded-xl p-5 border border-white/10 hover:border-purple-500/30 transition-all';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-bold text-lg text-white">${new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</h4>
+                            <p class="text-gray-400 text-sm">${data.meetings?.length || 0} meetings, ${data.jobs?.length || 0} applications</p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // UTILITIES
+        function updateDateDisplay() {
+            const now = new Date();
+            const dateEl = document.getElementById('currentDate');
+            const dayEl = document.getElementById('currentDay');
+            
+            if (dateEl) {
+                dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            }
+            if (dayEl) {
+                dayEl.textContent = `Day ${Math.ceil((now - new Date(now.getFullYear(), 0, 0)) / 86400000)} of ${now.getFullYear()}`;
+            }
+        }
+
+        function loadRandomQuote() {
+            const quote = appData.quotes[Math.floor(Math.random() * appData.quotes.length)];
+            const quoteEl = document.getElementById('dailyQuote');
+            const authorEl = document.getElementById('quoteAuthor');
+            
+            if (quoteEl) quoteEl.textContent = `"${quote.text}"`;
+            if (authorEl) authorEl.textContent = `— ${quote.author}`;
+        }
+
+        function renderAll() {
+            updateProgress();
+            renderWeeklyBar();
+        }
+
+        function showCompletionModal() {
+            const modal = document.getElementById('completionModal');
+            const content = document.getElementById('modalContent');
+            if (!modal) return;
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                if (content) {
+                    content.classList.remove('scale-95', 'opacity-0');
+                    content.classList.add('scale-100', 'opacity-100');
+                }
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('completionModal');
+            const content = document.getElementById('modalContent');
+            
+            if (content) {
+                content.classList.remove('scale-100', 'opacity-100');
+                content.classList.add('scale-95', 'opacity-0');
+            }
+            setTimeout(() => {
+                if (modal) modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function triggerConfetti() {
+            const duration = 3000;
+            const end = Date.now() + duration;
+
+            (function frame() {
+                confetti({
+                    particleCount: 3,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#a855f7', '#3b82f6', '#06b6d4']
+                });
+                confetti({
+                    particleCount: 3,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#a855f7', '#3b82f6', '#06b6d4']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            }());
+        }
+
+        function resetAllData() {
+            if (confirm('WARNING: Delete ALL data?')) {
+                localStorage.removeItem('growthOSData');
+                location.reload();
+            }
+        }
+
+        // Save on unload
+        window.addEventListener('beforeunload', function() {
+            if (appData.todayData && (appData.todayData.meetings.length > 0 || appData.todayData.jobs.length > 0 || appData.todayData.tweets.length > 0 || Object.keys(appData.todayData.tasks).length > 0)) {
+                appData.history[appData.currentDate] = {...appData.todayData};
+                saveData();
+            }
+        });
+    </script>
+</body>
+</html>
